@@ -64,7 +64,7 @@ Abre el archivo y completa los **TODOs** siguiendo las pistas:
 | TODO 1 | ¿Qué evento activa el CI? | Se activa al abrir un Pull Request
 
 
-#### 4d. Configurar el workflow de CD (`.github/workflows/cd.yml`)
+#### 4c. Configurar el workflow de CD (`.github/workflows/cd.yml`)
 
 Abre el archivo y completa los **TODOs**:
 
