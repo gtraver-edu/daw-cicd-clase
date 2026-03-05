@@ -1,16 +1,14 @@
 # =============================================================
-# CI + AUTO-MERGE
+# WORKFLOW AUTOMÁTICO DE CONTRIBUCIONES
 # =============================================================
-# Este workflow:
-#   1. Valida que el PR solo modifica archivos en alumnos/
-#   2. Comprueba que el archivo de contribución tiene el formato correcto
-#   3. Si todo pasa, FUSIONA AUTOMÁTICAMENTE el PR
-#
-# Usa pull_request_target para tener permisos de escritura sobre el repo
-# base incluso cuando el PR viene de un fork.
+# Cuando un alumno abre un Pull Request, este workflow:
+#   1. Valida que solo se modifican archivos en alumnos/
+#   2. Comprueba que el archivo tiene el formato correcto
+#   3. Si todo pasa, FUSIONA el PR automáticamente
+#   4. Actualiza la galería y DESPLIEGA la web
 # =============================================================
 
-name: CI - Validar y auto-merge
+name: Validar, fusionar y desplegar
 
 on:
   pull_request_target:
@@ -100,9 +98,67 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Esperar a que el merge se propague
+        if: success()
+        run: sleep 5
+
+      - name: Clonar repositorio actualizado (post-merge)
+        if: success()
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Generar galería con las contribuciones
+        if: success()
+        run: |
+          echo "📊 Recopilando contribuciones de alumnos/..."
+
+          # Concatenar todos los archivos de contribución
+          > /tmp/galeria.html
+          TOTAL=0
+          for f in alumnos/*.html; do
+            [ "$(basename "$f")" = "ejemplo.html" ] && continue
+            cat "$f" >> /tmp/galeria.html
+            echo "" >> /tmp/galeria.html
+            TOTAL=$((TOTAL+1))
+          done
+
+          echo "   Encontradas $TOTAL contribuciones"
+
+          # Insertar las contribuciones en index.html entre los marcadores
+          python3 << 'PYEOF'
+          import re
+
+          with open('/tmp/galeria.html', 'r') as f:
+              galeria = f.read().strip()
+
+          with open('index.html', 'r') as f:
+              html = f.read()
+
+          nuevo = re.sub(
+              r'(<!-- INICIO GALERÍA -->).*?(<!-- FIN GALERÍA -->)',
+              lambda m: m.group(1) + '\n' + galeria + '\n' + m.group(2),
+              html,
+              flags=re.DOTALL
+          )
+
+          with open('index.html', 'w') as f:
+              f.write(nuevo)
+
+          print("✅ index.html actualizado con la galería")
+          PYEOF
+
+      - name: Desplegar en GitHub Pages
+        if: success()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+
       - name: Resultado
         if: success()
         run: |
           echo ""
-          echo "🎉 ¡Contribución validada y fusionada!"
-          echo "El workflow de CD se encargará de actualizar la página web."
+          echo "🎉 ¡Contribución validada, fusionada y desplegada!"
